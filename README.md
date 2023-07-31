@@ -1,3 +1,2 @@
 # Rock Paper Scissors
-## Demonstration of a Rock Paper Scissors app in React Native.
-###Ethan Raygor
+This project is a demonstration of a Rock Paper Scissors app in React Native.
