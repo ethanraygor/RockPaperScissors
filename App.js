@@ -1,16 +1,59 @@
 import { StatusBar } from 'expo-status-bar';
-import React, {useState} from 'react';
-import { StyleSheet, Text, View, Button } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { StyleSheet, Text, View, Button, Image, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { NavigationContainer } from '@react-navigation/native';
+import { HandImage } from './img/Image';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
-
-
-/*
+/* 
 * APP
 */
 export default function App() {
      const [winStreak, setWinStreak] = useState(0);
      const [winRecord, setWinRecord] = useState(0); 
      const [message, setMessage] = useState("Let's play rock, paper, scissors!");
+     const [imageSource, setImageSource] = useState(HandImage.GetImage('fist.png'));
+     const [imageRot, setImageRot] = useState('270deg');
+
+     /*
+     * SETTINGS AND STORAGE
+     */
+     const StoreData = async (streak, record) => {
+          try {
+               await AsyncStorage.setItem(
+                    'streak',
+                    streak.toString(),
+               );
+               await AsyncStorage.setItem(
+                    'record',
+                    record.toString(),
+               );
+          }catch (error){
+               console.log(error.message);
+          }
+     }
+
+     const GetData = async () => {
+          try{
+               const tmpStreak = await AsyncStorage.getItem('streak');
+               if(tmpStreak!=null){
+                    const streak = parseInt(tmpStreak);
+                    setWinStreak(streak);
+               }
+               const tmpRecord = await AsyncStorage.getItem('record');
+               if(tmpRecord!=null){
+                    const record = parseInt(tmpRecord);
+                    setWinRecord(record);
+               }
+          }catch (error){
+               console.log(error.message);
+          }
+     }
+
+     useEffect(() => {
+          GetData();
+     }, []);
 
      /*
      * TITLE
@@ -19,6 +62,16 @@ export default function App() {
           return (
                <View style={styles.title}>
                     <Text style={styles.titleText}>Rock, Paper, Scissors</Text>
+                    <View style={styles.settingsButton}>
+                         <Button
+                              onPress={() => {
+                                   props.nav.navigate('Settings');
+                              }}
+                              title='⚙️'
+                              style={styles.button}
+                              color='#201E20'
+                         />
+                    </View>
                </View>
           )
      };
@@ -32,7 +85,11 @@ export default function App() {
                     <Counter text={'Win Streak: ' + winStreak} />
                     <Counter text={'Streak Record: ' + winRecord} />
                     <View style={styles.handContainer}>
-                         <Text style={styles.hand}>👊</Text>
+                         <Image
+                              style={styles.hand}
+                              source={imageSource}
+                              transform={[{rotate: imageRot }]}
+                         />
                     </View>
                </View>
           )
@@ -100,6 +157,14 @@ export default function App() {
      */
      function playGame(h) {
           let o = Math.floor(Math.random() * 3);
+          setImageRot('0deg');
+          if (o == 0) {
+               setImageSource(HandImage.GetImage('rock.png'));
+          } else if (o == 1) {
+               setImageSource(HandImage.GetImage('paper.png'));
+          } else {
+               setImageSource(HandImage.GetImage('scissors.png'));
+          }
           if (o == h) {
                return 0;
           }
@@ -128,18 +193,21 @@ export default function App() {
           let tmpWinStreak;
           if(w == 0){
                setMessage("You drew!");
+               tmpWinStreak = winStreak;
           }else if (w == -1) {
                setMessage("You lost!");
                if (winStreak > 0) {
                     setWinStreak(-1);
+                    tmpWinStreak = -1;
                } else {
                     tmpWinStreak = winStreak - 1;
                     setWinStreak(tmpWinStreak);
                }
           } else if (w = 1) {
                setMessage("You won!");
-               if (winStreak < 0) {
+               if (winStreak <= 0) {
                     setWinStreak(1);
+                    tmpWinStreak = 1;
                } else {
                     tmpWinStreak = winStreak + 1;
                     setWinStreak(tmpWinStreak);
@@ -147,18 +215,83 @@ export default function App() {
           }
           if (winRecord < tmpWinStreak) {
                setWinRecord(tmpWinStreak);
+               StoreData(tmpWinStreak, tmpWinStreak);
+          }else{
+               StoreData(tmpWinStreak, winRecord);
           }
+     }
+
+     /**
+      * HOME SCREEN
+      */
+     function HomeScreen({navigation}) {
+          return (
+               <View style={styles.container}>
+                    <Title nav={navigation} />
+                    <Opponent />
+                    <Player />
+               </View>
+          );
+     }
+
+     /**
+      * SETTINGS SCREEN
+      */
+     function SettingsScreen({navigation}){
+          const clearRecordsAlert = () =>
+               Alert.alert('Clear all records?', 'This action is permenent and cannot be undone.', [
+                    {
+                         text: 'Cancel',
+                         style: 'cancel',
+                    },
+                    { 
+                         text: 'OK', 
+                         onPress: () => {
+                              StoreData(0, 0);
+                              setWinStreak(0);
+                              setWinRecord(0);
+                         }
+                    },
+               ]);
+
+          return (
+               <View style={styles.settingsContainer}>
+                    <View style={styles.settingsButtonContainer}>
+                         <Button
+                              onPress={() => {
+                                   clearRecordsAlert();
+                              }}
+                              title='Clear Records'
+                              style={styles.button}
+                              color='#201E20'
+                         />
+                    </View>
+                    <View style={styles.settingsButtonContainer}>
+                         <Button
+                              onPress={() => {
+                                   navigation.navigate('Home');
+                              }}
+                              title='Back to Game'
+                              style={styles.button}
+                              color='#201E20'
+                         />
+                    </View>
+               </View>
+          );
      }
 
      /**
       * RENDER
       */
+     const Stack = createNativeStackNavigator();
+
      return (
-          <View style={styles.container}>
-               <Title />
-               <Opponent />
-               <Player />
-          </View>
+          <NavigationContainer>
+               <Stack.Navigator>
+                    <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
+                    <Stack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
+               </Stack.Navigator>
+          </NavigationContainer>
      );
 }
 
@@ -187,6 +320,15 @@ const styles = StyleSheet.create({
           fontSize: 30,
           color: '#201E20',
      },
+     settingsButton: {
+          backgroundColor: '#DDC3A5',
+          width: '11%',
+          borderWidth: 3,
+          borderColor: '#201E20',
+          position: 'absolute',
+          top: 40,
+          right: 20,
+     },
      /* OPPONENT */
      opponent: {
           flex: 3,
@@ -204,14 +346,14 @@ const styles = StyleSheet.create({
           marginTop: '20%',
      },
      hand: {
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: 150,
+          height: '75%',
+          width: '75%',
+          resizeMode: 'contain',
      },
      /* COUNTER */
      counter: {
           flex: 1,
-          backgroundColor: '#DDC3A5',
+          backgroundColor: '#DDC3A5', 
           alignItems: 'center',
           justifyContent: 'center',
           height: '10%',
@@ -250,6 +392,21 @@ const styles = StyleSheet.create({
      playerText: {
           flex: 1,
           color: '#201E20',
-          fontSize: 20,
+          fontSize: 20, 
+     },
+     /**
+      * SETTINGS
+      */
+     settingsContainer: {
+          flex: 1,
+          backgroundColor: '#E0A96D',
+          alignItems: 'center',
+          justifyContent: 'space-evenly',
+     },
+     settingsButtonContainer: {
+          backgroundColor: '#DDC3A5',
+          width: '50%',
+          borderWidth: 3,
+          borderColor: '#201E20',
      },
 });
